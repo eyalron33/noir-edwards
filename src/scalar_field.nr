@@ -29,7 +29,7 @@ unconstrained fn get_wnaf_slices<let N: u32>(x: Field) -> ([u8; N], bool) {
     nibbles[0] += skew as u8;
     result[N - 1] = (nibbles[0] + 15) / 2;
     for i in 1..N {
-        let mut nibble: u8 = nibbles[i];
+        let nibble: u8 = nibbles[i];
         result[N - 1 - i] = (nibble + 15) / 2;
         if (nibble & 1 == 0) {
             result[N - 1 - i] += 1;
@@ -81,7 +81,12 @@ impl<let N: u32> std::convert::From<Field> for ScalarField<N> {
         // the field elements have 254 bits max, so we do not need to support N > 64
         static_assert(N <= 64, "N must be at most 64");
         let mut result: Self = ScalarField { base4_slices: [0; N], skew: false };
+
+        // Safety: the slices are range-checked to 4 bits below, and their recomposition
+        // (sum of (2*slice - 15) * 16^k, minus skew) is asserted equal to x. For N == 64
+        // it is additionally checked to be smaller than the field modulus.
         let (slices, skew): ([u8; N], bool) = unsafe { get_wnaf_slices(x) };
+        
         result.base4_slices = slices;
         result.skew = skew;
         if (N < 64) {
@@ -158,9 +163,6 @@ impl<let N: u32> ScalarField<N> {
 
     pub fn new() -> Self {
         Self { base4_slices: [0; N], skew: false }
-    }
-    fn get(self, idx: u32) -> u8 {
-        self.base4_slices[idx]
     }
 }
 

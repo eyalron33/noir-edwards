@@ -320,7 +320,11 @@ impl<Params> Curve<Params> {
         let x2 = other.x;
         let y1 = self.y;
         let y2 = other.y;
+        
+        // Safety: x, y and lambda are constrained below by the addition-law equations
+        // against x1, x2, y1, y2, a, d, and lambda == x1*x2*y1*y2.
         let (x, y, lambda) = unsafe { __add_unconstrained(x1, x2, y1, y2, a, d) };
+        
         let x1x2 = x1 * x2;
         let x1y2 = x1 * y2;
         std::as_witness(x1x2);
@@ -342,10 +346,14 @@ impl<Params> Curve<Params> {
     ///
     /// This method exists because of a Noir bug where `Params` cannot be accessed by an internal function
     /// called from internal function. e.g. compiler error if `mul` impl tries to call `dbl` :(
-    fn dbl_internal(self, a: Field, d: Field) -> Self {
+    fn dbl_internal(self, a: Field, _d: Field) -> Self {
         let x1 = self.x;
         let y1 = self.y;
-        let (x3, y3, _) = unsafe { __add_unconstrained(x1, x1, y1, y1, a, d) };
+
+        // Safety: x3 and y3 are constrained below: t3 == t1 determines y3 and
+        // t2 == t4 determines x3, both against x1, y1 and a.
+        let (x3, y3) = unsafe { __dbl_unconstrained(x1, y1, a) };
+        
         let x1x1a = x1 * x1 * a;
         std::as_witness(x1x1a);
         // t1 = a*x_1^2 + y_1^2
@@ -425,4 +433,11 @@ unconstrained fn __add_unconstrained(
     let y = (x1 * x2 * a - y1 * y2) / (lambda * d - 1);
     let x = (x1 * y2 + y1 * x2) / (lambda * d + 1);
     (x, y, lambda)
+}
+
+unconstrained fn __dbl_unconstrained(x1: Field, y1: Field, a: Field) -> (Field, Field) {
+    let t1 = a * x1 * x1 + y1 * y1;
+    let x3 = 2 * x1 * y1 / t1;
+    let y3 = (y1 * y1 - a * x1 * x1) / (2 - t1);
+    (x3, y3)
 }
